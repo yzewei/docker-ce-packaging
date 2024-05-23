@@ -63,7 +63,7 @@ jobs:
       - name: Create Release
         if : steps.check-release.outputs.create == '1'
         run: |
-          gh release create ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} --notes "**Full Changelog**: [${{ env.DOCKER_VERSION }}](https://github.com/moby/moby/releases/tag/${{ env.DOCKER_VERSION }})"
+          gh release create ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} --title ${{ env.DOCKER_VERSION }} --notes "**Full Changelog**: [${{ env.DOCKER_VERSION }}](https://github.com/moby/moby/releases/tag/${{ env.DOCKER_VERSION }})"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
