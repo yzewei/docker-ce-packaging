@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-DOCKER_VERSION=v26.1.3
+DOCKER_VERSION=v27.0.1
 
 ################################################################
-# REF: v26.1.3
-# VERSION: 26.1.3
-# PACKAGE_VERSION: 26.1
+# REF: v27.0.1
+# VERSION: 27.0.1
+# PACKAGE_VERSION: 27.0
 #
 REF=${DOCKER_VERSION}
 VERSION=${REF#v}
@@ -32,7 +32,7 @@ GO_IMAGE=golang:${GO_VERSION}-trixie
 # Debian 13 (trixie) support loong64
 #
 
-sed -i 's@DEBIAN_VERSIONS ?= debian-buster@DEBIAN_VERSIONS ?= debian-trixie debian-buster@g' deb/Makefile
+sed -i 's@DEBIAN_VERSIONS ?= debian-bullseye@DEBIAN_VERSIONS ?= debian-trixie debian-bullseye@g' deb/Makefile
 sed -i 's@docker build @docker buildx build --platform linux/loong64 --load @g' deb/Makefile
 
 make ARCH=loongarch64 ARCHES=loong64 REF=${REF} VERSION=${VERSION} GO_VERSION=${GO_VERSION} GO_IMAGE=${GO_IMAGE} debian-trixie
