@@ -1,16 +1,16 @@
-ARG GO_VERSION=1.21.10
+ARG GO_VERSION=1.23.4
 
 FROM ghcr.io/loong64/golang:${GO_VERSION}-trixie AS builder
 
-ARG RUNC_VERSION=v1.1.14
-ARG CONTAINERD_VERSION=v1.7.18
-ARG DOCKER_VERSION=v27.0.1
+ARG RUNC_VERSION=v1.2.2
+ARG CONTAINERD_VERSION=v1.7.24
+ARG DOCKER_VERSION=v27.4.0
 ARG TINI_VERSION=v0.19.0
 
 RUN set -ex; \
     ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime; \
     apt-get update; \
-    apt-get install -y wget g++ cmake make pkg-config git libseccomp-dev libbtrfs-dev libseccomp-dev libbtrfs-dev libdevmapper-dev; \
+    apt-get install -y wget g++ cmake make pkg-config git libseccomp-dev libbtrfs-dev libdevmapper-dev; \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /go/src/github.com/opencontainers
@@ -18,8 +18,10 @@ RUN set -ex; \
     git clone -b ${RUNC_VERSION} https://github.com/opencontainers/runc --depth=1
 
 WORKDIR /go/src/github.com/opencontainers/runc
-RUN sed -i 's@|| s390x@|| s390x || loong64@g' libcontainer/system/syscall_linux_64.go; \
-    sed -i 's@riscv64 s390x@riscv64 s390x loong64@g' libcontainer/system/syscall_linux_64.go; \
+RUN set -ex; \
+    curl -sSL "https://git.altlinux.org/tasks/archive/done/_352/361175/gears/100/git?p=git;a=blob_plain;f=.gear/runc-alt-libcontainer-loongarch64-support.patch;hb=ff0eabdba6265ddb4aa20d39f4a0ade5e59790f4" | git apply; \
+    go get -u github.com/seccomp/libseccomp-golang@v0.10.1-0.20240814065753-28423ed7600d; \
+    go mod vendor; \
     sed -i 's@--dirty @@g' Makefile; \
     make static; \
     ./runc -v
