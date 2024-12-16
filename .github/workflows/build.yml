@@ -28,7 +28,7 @@ jobs:
           rm -rf common.mk docker*
           sed -i "s@DOCKER_VERSION=.*@DOCKER_VERSION=${DOCKER_VERSION}@g" build-docker.sh
           sed -i "s@ARG GO_VERSION=.*@ARG GO_VERSION=${GO_VERSION}@" binaries/Dockerfile
-          sed -i "s@ARG RUNC_VERSION=.*@ARG RUNC_VERSION=${RUNC_VERSION}@" binaries/Dockerfile
+          # sed -i "s@ARG RUNC_VERSION=.*@ARG RUNC_VERSION=${RUNC_VERSION}@" binaries/Dockerfile
           sed -i "s@ARG CONTAINERD_VERSION=.*@ARG CONTAINERD_VERSION=${CONTAINERD_VERSION}@" binaries/Dockerfile
           sed -i "s@ARG DOCKER_VERSION=.*@ARG DOCKER_VERSION=${DOCKER_VERSION}@" binaries/Dockerfile
           sed -i "s@ARG TINI_VERSION=.*@ARG TINI_VERSION=${TINI_VERSION}@" binaries/Dockerfile
