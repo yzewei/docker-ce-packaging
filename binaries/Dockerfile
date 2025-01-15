@@ -19,7 +19,7 @@ RUN set -ex; \
 
 WORKDIR /go/src/github.com/opencontainers/runc
 RUN set -ex; \
-    curl -sSL "https://git.altlinux.org/tasks/archive/done/_352/361175/gears/100/git?p=git;a=blob_plain;f=.gear/runc-alt-libcontainer-loongarch64-support.patch;hb=ff0eabdba6265ddb4aa20d39f4a0ade5e59790f4" | git apply; \
+    curl -sSL "https://github.com/loong64/containerd-packaging/raw/refs/heads/main/runc.patch" | git apply; \
     go get -u github.com/seccomp/libseccomp-golang@v0.10.1-0.20240814065753-28423ed7600d; \
     go mod vendor; \
     sed -i 's@--dirty @@g' Makefile; \
