@@ -8,11 +8,14 @@ on:
 jobs:
   check-release:
     runs-on: ubuntu-latest
+    outputs:
+      DOCKER_VERSION: ${{ steps.get-version.outputs.DOCKER_VERSION }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
 
       - name: Get Version
+        id: get-version
         run: |
           DOCKER_VERSION=$(curl -s "https://api.github.com/repos/moby/moby/releases/latest" | jq -r ".tag_name")
           if [ -z "$DOCKER_VERSION" ] || [ "$DOCKER_VERSION" == "null" ]; then
@@ -37,6 +40,7 @@ jobs:
           sed -i "s@ARG DOCKER_VERSION=.*@ARG DOCKER_VERSION=${DOCKER_VERSION}@" binaries/Dockerfile
           sed -i "s@ARG TINI_VERSION=.*@ARG TINI_VERSION=${TINI_VERSION}@" binaries/Dockerfile
           echo "DOCKER_VERSION=${DOCKER_VERSION}" >> $GITHUB_ENV
+          echo "DOCKER_VERSION=${DOCKER_VERSION}" >> $GITHUB_OUTPUT
           echo ""
           echo "========== Build Args =========="
           echo "GO_VERSION=${GO_VERSION}"
@@ -74,10 +78,11 @@ jobs:
   build-binaries:
     runs-on: ubuntu-latest
     needs: check-release
+    env:
+      DOCKER_VERSION: ${{ needs.check-release.outputs.DOCKER_VERSION }}
     steps:
       - name: Get Version
         run: |
-          DOCKER_VERSION=$(curl -s "https://api.github.com/repos/moby/moby/releases/latest" | jq -r ".tag_name")
           echo "DOCKER_VERSION=${DOCKER_VERSION}" >> $GITHUB_ENV
 
       - uses: actions/checkout@v4
@@ -110,13 +115,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   
-  build-engine:
+  build-deb:
     runs-on: ubuntu-latest
     needs: check-release
+    env:
+      DOCKER_VERSION: ${{ needs.check-release.outputs.DOCKER_VERSION }}
     steps:
       - name: Get Version
         run: |
-          DOCKER_VERSION=$(curl -s "https://api.github.com/repos/moby/moby/releases/latest" | jq -r ".tag_name")
           echo "DOCKER_VERSION=${DOCKER_VERSION}" >> $GITHUB_ENV
 
       - uses: actions/checkout@v4
@@ -138,12 +144,51 @@ jobs:
       - name: Build Docker Engine
         if : steps.check-engine.outputs.create == '1'
         run: |
-          bash build-docker.sh
+          bash build-docker.sh --deb
 
       - name: Upgrade Release
         if : steps.check-engine.outputs.create == '1'
         run: |
           ls -al dist
           gh release upload ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-rpm:
+    runs-on: ubuntu-latest
+    needs: check-release
+    env:
+      DOCKER_VERSION: ${{ needs.check-release.outputs.DOCKER_VERSION }}
+    steps:
+      - name: Get Version
+        run: |
+          echo "DOCKER_VERSION=${DOCKER_VERSION}" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DOCKER_VERSION }}
+  
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Check Release
+        id: check-engine
+        run: |
+          gh release view ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} | grep docker-.*.rpm >/dev/null 2>&1 || echo "create=1" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup QEMU
+        run: docker run --rm --privileged ghcr.io/loong64/qemu-user-static --reset -p yes
+
+      - name: Build Docker Engine
+        if : steps.check-engine.outputs.create == '1'
+        run: |
+          bash build-docker.sh --rpm
+
+      - name: Upgrade Release
+        if : steps.check-engine.outputs.create == '1'
+        run: |
+          ls -al dist
+          gh release upload ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} dist/SRPMS/* dist/RPMS/loongarch64/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
