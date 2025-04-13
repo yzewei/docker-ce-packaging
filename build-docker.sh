@@ -1,6 +1,5 @@
 #!/bin/bash
 #
-DOCKER_VERSION=v27.0.1
 
 BUILD_DEB=0
 BUILD_RPM=0
@@ -13,21 +12,21 @@ while [[ $# > 0 ]]; do
             echo
             echo "Global Options:"
             echo -e "  -h, --help  \t Show this help message and exit"
-            echo -e "  --deb  \t Build Debian-trixie deb package"
-            echo -e "  --rpm  \t Build OpenCloudOS-23 rpm package"
+            echo -e "  --distro  \t Specify the distribution (e.g., debian, anolis)"
+            echo -e "  --suite   \t Specify the suite or release codename (e.g., trixie, 23)"
             exit 0
             ;;
-        --deb)
-            BUILD_DEB=1
+        --distro)
+            DISTRO=$2
             shift
             ;;
-        --rpm)
-            BUILD_RPM=1
+        --suite)
+            SUITE=$2
             shift
             ;;
         *)
-            echo "install: Unknown option $1"
-            echo "eg: $0 --deb --rpm"
+            echo "Error: Unknown option $1"
+            echo "eg: $0 --distro debian --suite trixie"
             exit 1
             ;;
     esac
@@ -39,15 +38,32 @@ done
 # VERSION: 27.0.1
 # PACKAGE_VERSION: 27.0
 #
-REF=${DOCKER_VERSION}
+REF=${DOCKER_VERSION:?}
 VERSION=${REF#v}
 PACKAGE_VERSION=${VERSION%.*}
 
 TMPDIR=$(mktemp -d)
 
 git clone --depth=1 https://github.com/docker/docker-ce-packaging "${TMPDIR}"
-cp -R debian-trixie "${TMPDIR}/deb/"
-cp -f opencloudos-23/Dockerfile "${TMPDIR}/rpm/fedora-41/Dockerfile"
+
+case "${DISTRO}" in
+    debian)
+        BUILD_DEB=1
+        cp -R debian-trixie "${TMPDIR}/deb/"
+        ;;
+    anolis)
+        BUILD_RPM=1
+        cp -f anolis-23/Dockerfile "${TMPDIR}/rpm/fedora-41/Dockerfile"
+        ;;
+    opencloudos)
+        BUILD_RPM=1
+        cp -f opencloudos-23/Dockerfile "${TMPDIR}/rpm/fedora-41/Dockerfile"
+        ;;
+    *)
+        echo "Error: Unknown distribution ${DISTRO}"
+        exit 1
+        ;;
+esac
 
 pushd "${TMPDIR}" || exit 1
 

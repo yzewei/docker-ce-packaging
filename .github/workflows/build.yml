@@ -12,7 +12,6 @@ jobs:
       DOCKER_VERSION: ${{ steps.get-version.outputs.DOCKER_VERSION }}
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
 
       - name: Get Version
         id: get-version
@@ -33,7 +32,6 @@ jobs:
           TINI_VERSION=$(./docker/docker-init --version | awk '{print $3}')
           [[ $TINI_VERSION != v* ]] && TINI_VERSION="v$TINI_VERSION"
           rm -rf common.mk docker*
-          sed -i "s@DOCKER_VERSION=.*@DOCKER_VERSION=${DOCKER_VERSION}@g" build-docker.sh
           sed -i "s@ARG GO_VERSION=.*@ARG GO_VERSION=${GO_VERSION}@" binaries/Dockerfile
           sed -i "s@ARG RUNC_VERSION=.*@ARG RUNC_VERSION=${RUNC_VERSION}@" binaries/Dockerfile
           sed -i "s@ARG CONTAINERD_VERSION=.*@ARG CONTAINERD_VERSION=${CONTAINERD_VERSION}@" binaries/Dockerfile
@@ -81,14 +79,11 @@ jobs:
     env:
       DOCKER_VERSION: ${{ needs.check-release.outputs.DOCKER_VERSION }}
     steps:
-      - name: Get Version
-        run: |
-          echo "DOCKER_VERSION=${DOCKER_VERSION}" >> $GITHUB_ENV
-
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.DOCKER_VERSION }}
-        
+      
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
       - name: Check Release
@@ -97,9 +92,6 @@ jobs:
           gh release view ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} | grep docker-.*.tgz >/dev/null 2>&1 || echo "create=1" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup QEMU
-        run: docker run --rm --privileged ghcr.io/loong64/qemu-user-static --reset -p yes
 
       - name: Build Docker Binaries
         if : steps.check-binaries.outputs.create == '1'
@@ -120,15 +112,14 @@ jobs:
     needs: check-release
     env:
       DOCKER_VERSION: ${{ needs.check-release.outputs.DOCKER_VERSION }}
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [ 'debian' ]
+        suite: [ 'trixie' ]
     steps:
-      - name: Get Version
-        run: |
-          echo "DOCKER_VERSION=${DOCKER_VERSION}" >> $GITHUB_ENV
-
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.DOCKER_VERSION }}
-  
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
       - name: Check Release
@@ -138,13 +129,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup QEMU
-        run: docker run --rm --privileged ghcr.io/loong64/qemu-user-static --reset -p yes
-
       - name: Build Docker Engine
         if : steps.check-engine.outputs.create == '1'
         run: |
-          bash build-docker.sh --deb
+          sudo chmod 755 ./build-docker.sh
+          ./build-docker.sh --distro ${{ matrix.distro }} --suite ${{ matrix.suite }}
 
       - name: Upgrade Release
         if : steps.check-engine.outputs.create == '1'
@@ -159,31 +148,36 @@ jobs:
     needs: check-release
     env:
       DOCKER_VERSION: ${{ needs.check-release.outputs.DOCKER_VERSION }}
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [ 'anolis', 'opencloudos' ]
+        suite: [ '23' ]
     steps:
-      - name: Get Version
-        run: |
-          echo "DOCKER_VERSION=${DOCKER_VERSION}" >> $GITHUB_ENV
-
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.DOCKER_VERSION }}
-  
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
       - name: Check Release
         id: check-engine
         run: |
-          gh release view ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} | grep docker-.*.rpm >/dev/null 2>&1 || echo "create=1" >> $GITHUB_OUTPUT
+          case "${{ matrix.distro }}" in
+            anolis)
+              gh release view ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} | grep docker-.*an23.src.rpm >/dev/null 2>&1 || echo "create=1" >> $GITHUB_OUTPUT
+              ;;
+            opencloudos)
+              gh release view ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} | grep docker-.*ocs23.src.rpm >/dev/null 2>&1 || echo "create=1" >> $GITHUB_OUTPUT
+              ;;
+          esac
+          
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup QEMU
-        run: docker run --rm --privileged ghcr.io/loong64/qemu-user-static --reset -p yes
 
       - name: Build Docker Engine
         if : steps.check-engine.outputs.create == '1'
         run: |
-          bash build-docker.sh --rpm
+          sudo chmod 755 ./build-docker.sh
+          ./build-docker.sh --distro ${{ matrix.distro }} --suite ${{ matrix.suite }}
 
       - name: Upgrade Release
         if : steps.check-engine.outputs.create == '1'
