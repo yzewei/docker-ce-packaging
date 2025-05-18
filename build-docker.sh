@@ -49,7 +49,6 @@ git clone --depth=1 https://github.com/docker/docker-ce-packaging "${TMPDIR}"
 case "${DISTRO}" in
     debian)
         BUILD_DEB=1
-        cp -R debian-trixie "${TMPDIR}/deb/"
         ;;
     anolis)
         BUILD_RPM=1
@@ -81,10 +80,10 @@ GO_IMAGE=golang:${GO_VERSION}-trixie
 # Debian 13 (trixie) support loong64
 #
 
-sed -i 's@DEBIAN_VERSIONS ?= debian-bullseye@DEBIAN_VERSIONS ?= debian-trixie debian-bullseye@g' deb/Makefile
 sed -i 's@docker build @docker buildx build --load @g' deb/Makefile
 
 if [ "${BUILD_DEB}" = '1' ]; then
+    sed -i 's@FROM @FROM ghcr.io/loong64/@g' deb/debian-trixie/Dockerfile
     make ARCH=loong64 ARCHES=loong64 REF=${REF} VERSION=${VERSION} GO_VERSION=${GO_VERSION} GO_IMAGE=${GO_IMAGE} debian-trixie
 fi
 if [ "${BUILD_RPM}" = '1' ]; then
