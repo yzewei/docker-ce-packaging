@@ -1,0 +1,162 @@
+name: Build Docker 5 latest releases
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 20 * * *'
+
+jobs:
+  get-tags:
+    runs-on: ubuntu-latest
+    outputs:
+      tags: ${{ steps.set-tags.outputs.tags }}
+    steps:
+      - id: set-tags
+        run: |
+          #          TAGS=$(curl -s https://api.github.com/repos/moby/moby/releases | jq -r '.[].tag_name' | grep -E '^v[0-9]' | head -n 5 | jq -R . | jq -cs .)
+          #echo "Fetched tags: $TAGS"
+          #printf "tags=%s\n" "$TAGS" >> "$GITHUB_OUTPUT"
+          TAGS=$(curl -s https://api.github.com/repos/moby/moby/releases \
+            | jq -r '.[].tag_name' \
+            | grep -E '^v[0-9]' \
+            | grep -v 'rc' \
+            | sort -V \
+            | tail -n 5 \
+            | jq -R . | jq -cs .)
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+  check-release:
+    needs: get-tags
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tag: ${{ fromJson(needs.get-tags.outputs.tags) }}
+    outputs:
+      DOCKER_VERSION: ${{ matrix.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get and Parse Versions
+        run: |
+          DOCKER_VERSION=${{ matrix.tag }}
+          wget -q https://github.com/docker/docker-ce-packaging/raw/master/common.mk
+          wget -q https://download.docker.com/linux/static/test/$(uname -m)/docker-${DOCKER_VERSION#*v}.tgz || exit 1
+          tar -xf docker-${DOCKER_VERSION#*v}.tgz
+          GO_VERSION=$(grep '^GO_VERSION' common.mk | awk -F ":=" '{print $2}' | xargs)
+          RUNC_VERSION=$(./docker/runc --version | grep "runc version" | awk '{print $3}')
+          [[ $RUNC_VERSION != v* ]] && RUNC_VERSION="v$RUNC_VERSION"
+          CONTAINERD_VERSION=$(./docker/containerd --version | awk '{print $3}')
+          [[ $CONTAINERD_VERSION != v* ]] && CONTAINERD_VERSION="v$CONTAINERD_VERSION"
+          TINI_VERSION=$(./docker/docker-init --version | awk '{print $3}')
+          [[ $TINI_VERSION != v* ]] && TINI_VERSION="v$TINI_VERSION"
+
+          echo "GO_VERSION=${GO_VERSION}" >> $GITHUB_ENV
+          echo "RUNC_VERSION=${RUNC_VERSION}" >> $GITHUB_ENV
+          echo "CONTAINERD_VERSION=${CONTAINERD_VERSION}" >> $GITHUB_ENV
+          echo "TINI_VERSION=${TINI_VERSION}" >> $GITHUB_ENV
+          echo "DOCKER_VERSION=${DOCKER_VERSION}" >> $GITHUB_ENV
+
+          echo "========== $DOCKER_VERSION =========="
+          echo "GO_VERSION=$GO_VERSION"
+          echo "RUNC_VERSION=$RUNC_VERSION"
+          echo "CONTAINERD_VERSION=$CONTAINERD_VERSION"
+          echo "TINI_VERSION=$TINI_VERSION"
+
+      - name: Create Release Tag
+        run: |
+          git config --global user.name "${GITHUB_ACTOR}"
+          git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git tag ${{ matrix.tag }} || true
+          git push origin ${{ matrix.tag }} || true
+
+      - name: Create GitHub Release
+        run: |
+          gh release view ${{ matrix.tag }} -R ${{ github.repository }} >/dev/null 2>&1 || \
+          gh release create ${{ matrix.tag }} -R ${{ github.repository }} --title ${{ matrix.tag }} --notes "Auto release for Docker version ${{ matrix.tag }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-binaries:
+    needs: check-release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tag: ${{ fromJson(needs.get-tags.outputs.tags) }}
+    env:
+      DOCKER_VERSION: ${{ matrix.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.tag }}
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Binaries
+        run: |
+          docker buildx build --platform linux/loong64 -t docker-static-loong64:${{ matrix.tag }} -f binaries/Dockerfile . --load
+
+      - name: Upload Binary Artifacts
+        run: |
+          mkdir -p dist && cp -r ./docker/* dist/ || true
+          ls -al dist
+          gh release upload ${{ matrix.tag }} -R ${{ github.repository }} dist/* || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-deb:
+    needs: check-release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tag: ${{ fromJson(needs.get-tags.outputs.tags) }}
+        distro: [ 'debian' ]
+        suite: [ 'trixie' ]
+    env:
+      DOCKER_VERSION: ${{ matrix.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker DEB Package
+        run: |
+          sudo chmod 755 ./build-docker.sh
+          ./build-docker.sh --distro ${{ matrix.distro }} --suite ${{ matrix.suite }}
+
+      - name: Upload DEB Package
+        run: |
+          ls -al dist
+          gh release upload ${{ matrix.tag }} -R ${{ github.repository }} dist/*.deb || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-rpm:
+    needs: check-release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tag: ${{ fromJson(needs.get-tags.outputs.tags) }}
+        distro: [ 'anolis', 'opencloudos' ]
+        suite: [ '23' ]
+    env:
+      DOCKER_VERSION: ${{ matrix.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker RPM Package
+        run: |
+          sudo chmod 755 ./build-docker.sh
+          ./build-docker.sh --distro ${{ matrix.distro }} --suite ${{ matrix.suite }}
+
+      - name: Upload RPM Package
+        run: |
+          ls -al dist
+          gh release upload ${{ matrix.tag }} -R ${{ github.repository }} dist/SRPMS/* dist/RPMS/loongarch64/* || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
