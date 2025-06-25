@@ -58,6 +58,10 @@ case "${DISTRO}" in
         BUILD_RPM=1
         cp -f opencloudos-23/Dockerfile "${TMPDIR}/rpm/fedora-41/Dockerfile"
         ;;
+    openeuler-24)
+        BUILD_RPM=1
+        cp -f openeuler-24/Dockerfile "${TMPDIR}/rpm/fedora-41/Dockerfile"
+        ;;
     *)
         echo "Error: Unknown distribution ${DISTRO}"
         exit 1
