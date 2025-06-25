@@ -7,7 +7,9 @@ ARG BUILD_IMAGE=${DISTRO}:${SUITE}
 
 FROM ghcr.io/loong64/${GO_IMAGE} AS golang
 
-FROM ghcr.io/loong64/${BUILD_IMAGE}
+#FROM ghcr.io/loong64/${BUILD_IMAGE}
+FROM lcr.loongnix.cn/openeuler/openeuler:24.03-LTS-SP1
+COPY openEuler.repo /etc/yum.repos.d/openEuler.repo
 ENV GOPROXY=https://proxy.golang.org|direct
 ENV GO111MODULE=off
 ENV GOPATH=/go

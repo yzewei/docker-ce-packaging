@@ -19,7 +19,6 @@ jobs:
           TAGS=$(curl -s https://api.github.com/repos/moby/moby/releases \
             | jq -r '.[].tag_name' \
             | grep -E '^v[0-9]' \
-            | grep -v 'rc' \
             | sort -V \
             | tail -n 5 \
             | jq -R . | jq -cs .)
@@ -35,6 +34,8 @@ jobs:
       DOCKER_VERSION: ${{ matrix.tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Get and Parse Versions
         run: |
@@ -87,14 +88,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ matrix.tag }}
+          #          ref: ${{ matrix.tag }}
+          ref: main
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
       - name: Build Docker Binaries
         run: |
-          docker buildx build --platform linux/loong64 -t docker-static-loong64:${{ matrix.tag }} -f binaries/Dockerfile . --load
+          docker buildx build --platform linux/loong64 -t docker-static-loong64:${{ matrix.tag }} --build-arg DOCKER_VERSION=${{ env.DOCKER_VERSION }} -f binaries/Dockerfile . --load
 
       - name: Upload Binary Artifacts
         run: |
@@ -116,6 +118,8 @@ jobs:
       DOCKER_VERSION: ${{ matrix.tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -138,15 +142,28 @@ jobs:
     strategy:
       matrix:
         tag: ${{ fromJson(needs.get-tags.outputs.tags) }}
-        distro: [ 'anolis', 'opencloudos' ]
-        suite: [ '23' ]
+        distro: [ 'anolis', 'opencloudos' , 'openeuler' ]
     env:
       DOCKER_VERSION: ${{ matrix.tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
+
+      - name: Determine Suite
+        id: set-suite
+        run: |
+          case "${{ matrix.distro }}" in
+            anolis|opencloudos)
+              echo "suite=23" >> $GITHUB_OUTPUT
+              ;;
+            openeuler)
+              echo "suite=2403" >> $GITHUB_OUTPUT
+              ;;
+          esac
 
       - name: Build Docker RPM Package
         run: |
