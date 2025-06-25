@@ -1,11 +1,20 @@
-ARG GO_VERSION=1.23.4
+ARG GO_VERSION=1.24.3
 
 FROM ghcr.io/loong64/golang:${GO_VERSION}-trixie AS builder
 
-ARG RUNC_VERSION=v1.2.2
-ARG CONTAINERD_VERSION=v1.7.24
-ARG DOCKER_VERSION=v27.4.0
+ARG DOCKER_VERSION
 ARG TINI_VERSION=v0.19.0
+
+WORKDIR /go/src/github.com/docker
+RUN set -ex; \
+    git clone -b ${DOCKER_VERSION} https://github.com/moby/moby docker --depth=1
+
+# 提取 RUNC_VERSION 和 CONTAINERD_VERSION
+RUN set -ex; \
+    export RUNC_VERSION=$(grep -oP 'RUNC_VERSION:=[v0-9.]+' docker/hack/dockerfile/install/runc.installer | head -n1 | cut -d= -f2); \
+    export CONTAINERD_VERSION=$(grep -oP 'CONTAINERD_VERSION:=[v0-9.]+' docker/hack/dockerfile/install/containerd.installer | head -n1 | cut -d= -f2); \
+    echo "RUNC_VERSION=$RUNC_VERSION" > /versions.env; \
+    echo "CONTAINERD_VERSION=$CONTAINERD_VERSION" >> /versions.env
 
 RUN set -ex; \
     ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime; \
@@ -47,10 +56,6 @@ WORKDIR /go/src/github.com/docker/cli
 RUN make; \
     ./build/docker -v
 
-WORKDIR /go/src/github.com/docker
-RUN set -ex; \
-    git clone -b ${DOCKER_VERSION} https://github.com/moby/moby docker --depth=1
-
 WORKDIR /go/src/github.com/docker/docker
 RUN mkdir bin; \
     VERSION=${DOCKER_VERSION#*v} ./hack/make.sh; \
@@ -88,7 +93,7 @@ RUN set -ex; \
     rm -rf docker
 
 FROM ghcr.io/loong64/debian:trixie-slim
-ARG DOCKER_VERSION=v27.0.1
+ARG DOCKER_VERSION=v28.2.2
 
 COPY --from=builder /opt /opt
 WORKDIR /opt

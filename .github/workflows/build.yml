@@ -96,7 +96,7 @@ jobs:
       - name: Build Docker Binaries
         if : steps.check-binaries.outputs.create == '1'
         run: |
-          docker buildx build --platform linux/loong64 -t dokcer-static-loong64:${{ env.DOCKER_VERSION }} -f binaries/Dockerfile . --load
+          docker buildx build --platform linux/loong64 -t dokcer-static-loong64:${{ env.DOCKER_VERSION }} --build-arg DOCKER_VERSION=${{ env.DOCKER_VERSION }} -f binaries/Dockerfile . --load
 
       - name: Upgrade Release
         if : steps.check-binaries.outputs.create == '1'
@@ -151,8 +151,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        distro: [ 'anolis', 'opencloudos' ]
-        suite: [ '23' ]
+        include:
+          - distro: anolis
+            suite: '23'
+          - distro: opencloudos
+            suite: '23'
+          - distro: openeuler
+            suite: '2403'
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -167,6 +172,9 @@ jobs:
               ;;
             opencloudos)
               gh release view ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} | grep docker-.*ocs23.src.rpm >/dev/null 2>&1 || echo "create=1" >> $GITHUB_OUTPUT
+              ;;
+            openeuler)
+              gh release view ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} | grep docker-.*oe2403.src.rpm >/dev/null 2>&1 || echo "create=1" >> $GITHUB_OUTPUT
               ;;
           esac
           
