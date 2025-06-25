@@ -9,7 +9,6 @@ FROM ghcr.io/loong64/${GO_IMAGE} AS golang
 
 #FROM ghcr.io/loong64/${BUILD_IMAGE}
 FROM lcr.loongnix.cn/openeuler/openeuler:24.03-LTS-SP1
-COPY openEuler.repo /etc/yum.repos.d/openEuler.repo
 ENV GOPROXY=https://proxy.golang.org|direct
 ENV GO111MODULE=off
 ENV GOPATH=/go
@@ -20,7 +19,7 @@ ARG DISTRO
 ARG SUITE
 ENV DISTRO=${DISTRO}
 ENV SUITE=${SUITE}
-RUN dnf install -y rpm-build dnf-plugins-core
+RUN dnf install -y rpm-build dnf-plugins-core wget
 # FIXME(thaJeztah): workaround for building on Fedora 41 on arm64
 #
 # This is the equivalent of https://github.com/docker/containerd-packaging/pull/390
@@ -44,6 +43,7 @@ RUN dnf install -y rpm-build dnf-plugins-core
 # - https://src.fedoraproject.org/rpms/golang/c/a867bd88a656c1d6e91e7b18bab696dc3fcf1e77?branch=rawhide
 #
 # As a workaround; install binutils-gold
+RUN wget -O /etc/yum.repos.d/openEuler.repo https://github.com/yzewei/euler-repo/blob/main/openEuler.repo
 RUN if [ "$(arch)" = 'aarch64' ]; then dnf -y install binutils-gold; fi
 COPY --link SPECS /root/rpmbuild/SPECS
 RUN dnf builddep -y /root/rpmbuild/SPECS/*.spec
