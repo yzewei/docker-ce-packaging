@@ -45,9 +45,17 @@ jobs:
         run: |
           docker buildx build --platform linux/loong64 -t docker-static-loong64:${{ matrix.tag }} --build-arg DOCKER_VERSION=${{ env.DOCKER_VERSION }} -f binaries/Dockerfile . --load
 
+      
+      - name: Extract Binary Artifacts
+        run: |
+          mkdir -p dist
+          docker run --rm -v ${{ github.workspace }}/dist:/out \
+          docker-static-loong64:${{ matrix.tag }} \
+          bash -c 'cp /opt/docker-* /out/ || true'
+
       - name: Upload Binary Artifacts
         run: |
-          mkdir -p dist && cp -r ./docker/* dist/ || true
+          #          mkdir -p dist && cp -r ./docker/* dist/ || true
           ls -al dist
           gh release upload ${{ matrix.tag }} -R ${{ github.repository }} dist/* || true
         env:

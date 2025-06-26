@@ -19,6 +19,7 @@ ARG DISTRO
 ARG SUITE
 ENV DISTRO=${DISTRO}
 ENV SUITE=${SUITE}
+RUN curl -L -o /etc/yum.repos.d/openEuler.repo https://raw.githubusercontent.com/yzewei/euler-repo/main/openEuler.repo
 RUN dnf install -y rpm-build dnf-plugins-core wget
 # FIXME(thaJeztah): workaround for building on Fedora 41 on arm64
 #
@@ -43,7 +44,6 @@ RUN dnf install -y rpm-build dnf-plugins-core wget
 # - https://src.fedoraproject.org/rpms/golang/c/a867bd88a656c1d6e91e7b18bab696dc3fcf1e77?branch=rawhide
 #
 # As a workaround; install binutils-gold
-RUN wget -O /etc/yum.repos.d/openEuler.repo https://github.com/yzewei/euler-repo/blob/main/openEuler.repo
 RUN if [ "$(arch)" = 'aarch64' ]; then dnf -y install binutils-gold; fi
 COPY --link SPECS /root/rpmbuild/SPECS
 RUN dnf builddep -y /root/rpmbuild/SPECS/*.spec

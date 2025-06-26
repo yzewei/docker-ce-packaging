@@ -174,7 +174,7 @@ jobs:
               gh release view ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} | grep docker-.*ocs23.src.rpm >/dev/null 2>&1 || echo "create=1" >> $GITHUB_OUTPUT
               ;;
             openeuler)
-              gh release view ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} | grep docker-.*oe2403.src.rpm >/dev/null 2>&1 || echo "create=1" >> $GITHUB_OUTPUT
+              gh release view ${{ env.DOCKER_VERSION }} -R ${{ github.repository }} | grep docker-*.src.rpm >/dev/null 2>&1 || echo "create=1" >> $GITHUB_OUTPUT
               ;;
           esac
           

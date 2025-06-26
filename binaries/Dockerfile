@@ -95,7 +95,7 @@ RUN set -ex; \
     rm -rf docker
 
 FROM ghcr.io/loong64/debian:trixie-slim
-ARG DOCKER_VERSION=v28.2.2
+ARG DOCKER_VERSION
 
 COPY --from=builder /opt /opt
 WORKDIR /opt
