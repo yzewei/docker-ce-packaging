@@ -3,7 +3,7 @@ name: Build Docker 5 latest releases
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 20 * * *'
+    - cron: '0 22 * * *'
 
 jobs:
   get-tags:
